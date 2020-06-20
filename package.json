@@ -1,0 +1,17 @@
+{
+    "name": "jsite-cache",
+    "version": "1.0.0",
+    "description": "",
+    "main": "./lib/src/lib/Cache",
+    "dependencies": {},
+    "devDependencies": {
+        "@types/node": "^14.0.13"
+    },
+    "scripts": {
+        "build": "tsc",
+        "test": "npm run build && mocha lib/src/test"
+    },
+    "keywords": [],
+    "author": "Luke Wilson <lukesrw@gmail.com>",
+    "license": "ISC"
+}
