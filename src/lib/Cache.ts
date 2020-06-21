@@ -41,7 +41,7 @@ module.exports = class Cache implements CacheInterface {
      * @param {object} options to set
      * @returns {Cache} Self instance
      */
-    setOptions(options?: object): this {
+    setOptions(options?: CacheOptionsInterface): this {
         this.options = Object.assign({}, DEFAULT_OPTIONS, this.options || {}, options || {});
 
         return this;
@@ -53,25 +53,15 @@ module.exports = class Cache implements CacheInterface {
      * @param {string|function} key to format
      * @returns {string} Formatted key
      */
-    static formatKey(key: string | Function): string {
+    static formatKey(key: string | Function | Array<any>): string {
         if (!key) return key;
 
         // just take the first line of functions, e.g. "function myFunction(arg1, arg2) {"
-        if (typeof key === "function") return String(key).split("\n")[0].trim();
+        if (typeof key === "function") {
+            key = String(key).split("\n")[0].trim();
+        }
 
-        return String(key);
-    }
-
-    /**
-     * Format arguments for storage
-     *
-     * @param {array} [args=[]] to format
-     * @returns {string} formatted arguments
-     */
-    static formatArgs(args: Array<any> | string = []): string {
-        if (!args) return args;
-
-        return JSON.stringify(args || []);
+        return JSON.stringify(key);
     }
 
     /**
@@ -298,7 +288,7 @@ module.exports = class Cache implements CacheInterface {
 
             let time_now = new Date().getTime();
 
-            args = Cache.formatArgs(args);
+            args = Cache.formatKey(args);
             if (!Object.prototype.hasOwnProperty.call(this.data[key], args)) {
                 this.data[key][args] = {
                     data,
@@ -334,7 +324,7 @@ module.exports = class Cache implements CacheInterface {
         if (typeof key !== "string") key = Cache.formatKey(key);
 
         if (Object.prototype.hasOwnProperty.call(this.data, key)) {
-            if (typeof args !== "string") args = Cache.formatArgs(args);
+            if (typeof args !== "string") args = Cache.formatKey(args);
 
             if (Object.prototype.hasOwnProperty.call(this.data[key], args)) return this.data[key][args];
         }
@@ -438,7 +428,7 @@ module.exports = class Cache implements CacheInterface {
      */
     unset(key: string | Function, args: Array<any> | string) {
         key = Cache.formatKey(key);
-        args = Cache.formatArgs(args);
+        args = Cache.formatKey(args);
 
         if (key === undefined) {
             if (args === undefined) {
