@@ -342,32 +342,24 @@ module.exports = class Cache implements CacheInterface {
      * @param {boolean} [use_cache=true] for retrieving
      * @returns {Promise} Pending promise with cache data/result
      */
-    use(func: Function, args = [], use_cache: Function | boolean = true) {
-        return new Promise((resolve, reject) => {
-            let cache;
+    async use(func: Function, args = [], use_cache: Function | boolean = true): Promise<any> {
+        let cache;
 
-            if (use_cache) {
-                cache = this.get(func, args);
+        if (use_cache) {
+            cache = this.get(func, args);
 
-                if (
-                    cache &&
-                    (typeof use_cache !== "function" || (typeof use_cache === "function" && !use_cache(cache)))
-                ) {
-                    return resolve(cache);
-                }
+            if (cache && (typeof use_cache !== "function" || (typeof use_cache === "function" && !use_cache(cache)))) {
+                return cache;
             }
+        }
 
-            if (typeof func === "function") {
-                return promisify(func)(...args)
-                    .then((data: any) => this.set(func, data, args))
-                    .then(resolve)
-                    .catch(reject);
-            }
+        if (typeof func === "function") {
+            return this.set(func, await promisify(func)(...args), args);
+        }
 
-            cache = this.inspect(func, args);
+        cache = this.inspect(func, args);
 
-            return resolve(cache ? cache.data : undefined);
-        });
+        return cache ? cache.data : undefined;
     }
 
     /**
