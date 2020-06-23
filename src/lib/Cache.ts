@@ -1,9 +1,10 @@
 /**
  * Node.js modules
  */
-import { createReadStream, createWriteStream, readFileSync, writeFileSync } from "fs";
+import { createReadStream, createWriteStream, readFileSync, writeFileSync, PathLike } from "fs";
 import { promisify } from "util";
-import { deflate, deflateSync, inflate, inflateSync } from "zlib";
+import { deflateSync, inflateSync } from "zlib";
+import { deflate, inflate } from "../modules/zlib";
 import { once } from "events";
 
 /**
@@ -30,9 +31,13 @@ module.exports = class Cache implements CacheInterface {
      * @param {object} [data={}] to start with
      */
     constructor(options?: CacheOptionsInterface, data?: CacheDataInterface) {
-        this.data = data || {};
-
         this.setOptions(options);
+
+        data = data || {};
+        if (typeof data !== "object" || Array.isArray(data) || data === null) {
+            throw new Error("Data must be an object");
+        }
+        this.data = data;
     }
 
     /**
@@ -105,102 +110,111 @@ module.exports = class Cache implements CacheInterface {
     }
 
     /**
-     * Create a Cache utility from data
-     *
-     * @param {Buffer|object|string} data to create cache from
-     * @param {object} [options={}] for configuration
-     * @returns {Promise} Pending promise with cache from data
+     * JSON
      */
-    static async fromData(data: Buffer | string | object, options: CacheOptionsInterface): Promise<Cache> {
-        if (Buffer.isBuffer(data)) {
-            try {
-                let buffer = (await promisify(inflate)(data)) as Buffer;
-
-                return this.fromData(buffer.toString(), options);
-            } catch (error) {
-                return error;
-            }
-        }
-
-        if (typeof data === "object" && !Array.isArray(data) && data !== null) {
-            return new Cache(options, data as CacheDataInterface);
-        }
-
-        if (typeof data === "string") {
-            try {
-                data = JSON.parse(data);
-            } catch (ignore) {
-                data = {};
-            }
-
-            return new Cache(options, data as CacheDataInterface);
-        }
-
-        throw new Error("Unable to create from data");
-    }
-
-    /**
-     * Create a Cache utility from data (but synchronously)
-     *
-     * @param {Buffer|object|string} data to create cache from
-     * @param {object} [options={}] for configuration
-     * @returns {Cache} Cache from data
-     */
-    static fromDataSync(data: Buffer | string | object, options: CacheOptionsInterface): Cache {
-        if (Buffer.isBuffer(data)) {
-            return this.fromDataSync(inflateSync(data).toString(), options); // eslint-disable-line
-        }
-
-        if (typeof data === "object" && !Array.isArray(data) && data !== null) {
-            return new Cache(options, data as CacheDataInterface);
-        }
-
-        if (typeof data === "string") {
-            try {
-                data = JSON.parse(data);
-            } catch (ignore) {
-                data = {};
-            }
-
-            return new Cache(options, data as CacheDataInterface);
-        }
-
-        throw new Error("Unable to create from data");
-    }
-
-    /**
-     * @returns {string} JSON data
-     */
-    toJSON() {
+    toJSON(): string {
         return JSON.stringify(this.data, null, 4);
     }
 
-    /**
-     * Retrieve cache data (as JSON or compressed)
-     *
-     * @param {boolean} [as_json=false] or compressed data
-     * @returns {Promise} Pending promise with cache data
-     */
-    toData(as_json = false) {
-        return new Promise((resolve, reject) => {
-            let data = this.toJSON();
+    async toJSONFile(location: PathLike): Promise<string> {
+        let json = this.toJSON();
 
-            if (as_json) return resolve(data);
+        let stream = createWriteStream(location);
+        stream.write(json);
 
-            return promisify(deflate)(Buffer.from(data)).then(resolve).catch(reject);
-        });
+        await once(stream, "end");
+
+        return json;
+    }
+    toJSONFileSync(location: PathLike): string {
+        let json = this.toJSON();
+
+        writeFileSync(location, json);
+
+        return json;
     }
 
     /**
-     * Retrieve cache data (as JSON or compressed) (but synchronously)
-     *
-     * @param {boolean} [as_json=false] or compressed data
-     * @returns {Buffer|string} Cached data
+     * Un-JSON
      */
-    toDataSync(as_json = false) {
-        let data = this.toJSON();
+    static fromJSON(data: string, options?: CacheOptionsInterface): Cache {
+        return new Cache(options, JSON.parse(data));
+    }
 
-        return as_json ? data : deflateSync(Buffer.from(data));
+    static async fromJSONFile(location: PathLike): Promise<Cache> {
+        let data = "";
+        let stream = createReadStream(location);
+
+        stream
+            .on("data", chunk => (data += chunk))
+            .on("error", error => {
+                throw error;
+            });
+
+        await once(stream, "end");
+
+        return this.fromJSON(data);
+    }
+    static fromJSONFileSync(location: PathLike): Cache {
+        return this.fromJSON(readFileSync(location, "utf8"));
+    }
+
+    /**
+     * Pack
+     */
+    toPack(): Promise<Buffer> {
+        return deflate(this.toJSON());
+    }
+    toPackSync(): Buffer {
+        return deflateSync(this.toJSON());
+    }
+
+    async toPackFile(location: PathLike): Promise<Buffer> {
+        let pack = await this.toPack();
+
+        let stream = createWriteStream(location);
+        stream.write(pack);
+
+        await once(stream, "end");
+
+        return pack;
+    }
+    toPackFileSync(location: PathLike): Buffer {
+        let pack = this.toPackSync();
+
+        writeFileSync(location, pack);
+
+        return pack;
+    }
+
+    /**
+     * Un-pack
+     */
+    static async fromPack(data: Buffer, options?: CacheOptionsInterface): Promise<Cache> {
+        let buffer = await inflate(data);
+
+        return this.fromJSON(buffer.toString(), options);
+    }
+    static fromPackSync(data: Buffer, options?: CacheOptionsInterface): Cache {
+        return this.fromJSON(inflateSync(data).toString(), options);
+    }
+
+    static async fromPackFile(location: PathLike) {
+        let data: Array<Buffer> = [];
+        let stream = createReadStream(location);
+
+        stream
+            .on("data", chunk => data.push(Buffer.from(chunk)))
+            .on("error", error => {
+                throw error;
+            });
+
+        await once(stream, "end");
+
+        return this.fromPack(Buffer.concat(data));
+    }
+    static fromPackFileSync(location: PathLike) {
+        return this.fromPackSync(readFileSync(location));
     }
 
     /**
@@ -210,7 +224,7 @@ module.exports = class Cache implements CacheInterface {
      * @param {object} [options={}] for configuration
      * @returns {Promise} Pending promise with cache from file
      */
-    static async fromFile(location: string, options: CacheOptionsInterface): Promise<Cache> {
+    static async fromFile(location: string, options?: CacheOptionsInterface): Promise<Cache> {
         if (!location || typeof location !== "string") {
             throw new Error("Unable to create from file");
         }
@@ -227,47 +241,12 @@ module.exports = class Cache implements CacheInterface {
         await once(stream, "end");
 
         let new_data = Buffer.concat(data);
-        // let new_data = Buffer.from(data);
 
-        return this.fromData(location.endsWith(".json") ? new_data.toString() : new_data, options);
-    }
+        if (location.endsWith(".json")) {
+            return this.fromJSON(new_data.toString(), options);
+        }
 
-    /**
-     * Create a Cache utility from file (but synchronously)
-     *
-     * @param {string} location of file
-     * @param {object} [options={}] for configuration
-     * @returns {Cache} Cache from file
-     */
-    static fromFileSync(location: string, options: CacheOptionsInterface) {
-        let data = readFileSync(location);
-
-        return this.fromDataSync(location.endsWith(".json") ? data.toString() : data, options); // eslint-disable-line
-    }
-
-    /**
-     * Save cache data to file
-     *
-     * @param {string} location of file
-     * @returns {Promise} Pending promise with file write
-     */
-    toFile(location: string) {
-        return new Promise((resolve, reject) => {
-            return this.toData(location.endsWith(".json"))
-                .then(data => createWriteStream(location).write(data))
-                .then(resolve)
-                .catch(reject);
-        });
-    }
-
-    /**
-     * Save cache data to file (but synchronously)
-     *
-     * @param {string} location of file
-     * @returns {*} File write
-     */
-    toFileSync(location: string) {
-        return writeFileSync(location, this.toDataSync(location.endsWith(".json"))); // eslint-disable-line
+        return this.fromPack(new_data, options);
     }
 
     /**
