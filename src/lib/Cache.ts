@@ -11,7 +11,12 @@ import { once } from "events";
  * Custom libs
  */
 import Stat from "./Stat";
-import { CacheInterface, CacheOptionsInterface, CacheDataInterface } from "../interfaces/Cache";
+import {
+    CacheInterface,
+    CacheOptionsInterface,
+    CacheDataRecordInterface,
+    CacheDataInterface
+} from "../interfaces/Cache";
 
 /**
  * Constants
@@ -199,7 +204,7 @@ module.exports = class Cache implements CacheInterface {
         return this.fromJSON(inflateSync(data).toString(), options);
     }
 
-    static async fromPackFile(location: PathLike) {
+    static async fromPackFile(location: PathLike): Promise<Cache> {
         let data: Array<Buffer> = [];
         let stream = createReadStream(location);
 
@@ -213,7 +218,7 @@ module.exports = class Cache implements CacheInterface {
 
         return this.fromPack(Buffer.concat(data));
     }
-    static fromPackFileSync(location: PathLike) {
+    static fromPackFileSync(location: PathLike): Cache {
         return this.fromPackSync(readFileSync(location));
     }
 
@@ -258,7 +263,7 @@ module.exports = class Cache implements CacheInterface {
      * @param {object} [options={}] to override configuration
      * @returns {*} Data being stored
      */
-    set(key: string | Function, data: any, args: Array<any> | string = []) {
+    set<DataType>(key: string | Function, data: DataType, args: Array<any> | string = []): DataType {
         if (data !== undefined) {
             key = Cache.formatKey(key);
             if (!Object.prototype.hasOwnProperty.call(this.data, key)) {
@@ -299,7 +304,7 @@ module.exports = class Cache implements CacheInterface {
      * @param {array} [args=[]] to inspect
      * @returns {object|undefined} Data with metadata
      */
-    inspect(key: string | Function, args: Array<any> | string = []) {
+    inspect(key: string | Function, args: Array<any> | string = []): CacheDataRecordInterface | undefined {
         if (typeof key !== "string") key = Cache.formatKey(key);
 
         if (Object.prototype.hasOwnProperty.call(this.data, key)) {
@@ -319,7 +324,7 @@ module.exports = class Cache implements CacheInterface {
      * @param {boolean} [format=true] whether to format key & args
      * @returns {*|undefined} Data stored (or undefined, if none stored)
      */
-    get(key: string | Function, args: Array<any> | string = []) {
+    get(key: string | Function, args: Array<any> | string = []): any {
         let cache = this.inspect(key, args);
         let time_now = new Date().getTime();
 
@@ -357,9 +362,7 @@ module.exports = class Cache implements CacheInterface {
             return this.set(func, await promisify(func)(...args), args);
         }
 
-        cache = this.inspect(func, args);
-
-        return cache ? cache.data : undefined;
+        return this.get(func, args);
     }
 
     /**
@@ -370,7 +373,7 @@ module.exports = class Cache implements CacheInterface {
      * @param {boolean} [use_cache=true] for retrieving
      * @returns {*} Cache data/result
      */
-    useSync(func: Function, args = [], use_cache: Function | boolean = true) {
+    useSync(func: Function, args = [], use_cache: Function | boolean = true): any {
         let cache;
 
         if (use_cache) {
@@ -385,9 +388,7 @@ module.exports = class Cache implements CacheInterface {
             return this.set(func, func(...args), args);
         }
 
-        cache = this.inspect(func, args);
-
-        return cache ? cache.data : undefined;
+        return this.inspect(func, args);
     }
 
     /**
@@ -397,7 +398,7 @@ module.exports = class Cache implements CacheInterface {
      * @param {array} [args] to delete data from
      * @returns {Cache} Self instance
      */
-    unset(key: string | Function, args: Array<any> | string) {
+    unset(key: string | Function, args: Array<any> | string): this {
         key = Cache.formatKey(key);
         args = Cache.formatKey(args);
 
@@ -421,7 +422,7 @@ module.exports = class Cache implements CacheInterface {
      *
      * @returns {Cache} Self instance
      */
-    clean() {
+    clean(): this {
         Object.keys(this.data).forEach(key => {
             Object.keys(this.data[key]).forEach(args => {
                 if (this.get(key, args) === undefined) {
