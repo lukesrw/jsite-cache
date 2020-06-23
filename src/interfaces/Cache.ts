@@ -1,14 +1,16 @@
 import Stat from "../lib/Stat";
 
+export interface CacheDataRecordInterface {
+    data: any;
+    set: number;
+    changed: Stat;
+    used: Stat;
+    age_max?: number;
+}
+
 export interface CacheDataInterface {
     [key: string]: {
-        [args: string]: {
-            data: any;
-            set: number;
-            changed: Stat;
-            used: Stat;
-            age_max?: number;
-        };
+        [args: string]: CacheDataRecordInterface;
     };
 }
 
