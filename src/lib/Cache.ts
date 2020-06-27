@@ -25,7 +25,7 @@ const DEFAULT_OPTIONS: CacheOptionsInterface = {
     age_max: 600000 // 10 minutes
 };
 
-module.exports = class Cache implements CacheInterface {
+export default class Cache implements CacheInterface {
     data: CacheDataInterface;
     options!: CacheOptionsInterface;
 
@@ -435,4 +435,4 @@ module.exports = class Cache implements CacheInterface {
 
         return this;
     }
-};
+}
