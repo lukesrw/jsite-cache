@@ -5,7 +5,9 @@
     "main": "./lib/src/lib/Cache",
     "dependencies": {},
     "devDependencies": {
-        "@types/node": "^14.0.13"
+        "@types/node": "^14.0.13",
+        "chai": "^4.2.0",
+        "mocha": "^8.0.1"
     },
     "scripts": {
         "build": "tsc",
