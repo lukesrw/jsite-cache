@@ -2,6 +2,7 @@
  * Node.js modules
  */
 import { createReadStream, createWriteStream, readFileSync, writeFileSync, PathLike } from "fs";
+import { Readable } from "stream";
 import { promisify } from "util";
 import { deflateSync, inflateSync } from "zlib";
 import { deflate, inflate } from "../modules/zlib";
@@ -123,11 +124,12 @@ export default class Cache implements CacheInterface {
 
     async toJSONFile(location: PathLike): Promise<string> {
         let json = this.toJSON();
+        let readable = Readable.from([json]);
 
         let stream = createWriteStream(location);
-        stream.write(json);
+        readable.pipe(stream);
 
-        await once(stream, "end");
+        await once(readable, "end");
 
         return json;
     }
@@ -176,11 +178,12 @@ export default class Cache implements CacheInterface {
 
     async toPackFile(location: PathLike): Promise<Buffer> {
         let pack = await this.toPack();
+        let readable = Readable.from([pack]);
 
         let stream = createWriteStream(location);
-        stream.write(pack);
+        readable.pipe(stream);
 
-        await once(stream, "end");
+        await once(readable, "end");
 
         return pack;
     }
@@ -347,7 +350,7 @@ export default class Cache implements CacheInterface {
      * @param {boolean} [use_cache=true] for retrieving
      * @returns {Promise} Pending promise with cache data/result
      */
-    async use(func: Function, args = [], use_cache: Function | boolean = true): Promise<any> {
+    async use(func: Function, args: any[] = [], use_cache: Function | boolean = true): Promise<any> {
         let cache;
 
         if (use_cache) {
@@ -373,7 +376,7 @@ export default class Cache implements CacheInterface {
      * @param {boolean} [use_cache=true] for retrieving
      * @returns {*} Cache data/result
      */
-    useSync(func: Function, args = [], use_cache: Function | boolean = true): any {
+    useSync(func: Function, args: any[] = [], use_cache: Function | boolean = true): any {
         let cache;
 
         if (use_cache) {
