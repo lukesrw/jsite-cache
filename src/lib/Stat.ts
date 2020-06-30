@@ -1,6 +1,6 @@
 import { StatInterface, StatCompactInterface } from "../interfaces/Stat";
 
-export default class Stat implements StatInterface {
+export = class Stat implements StatInterface {
     values: number[];
 
     constructor(values: number[] = []) {
@@ -58,10 +58,14 @@ export default class Stat implements StatInterface {
             Object.prototype.hasOwnProperty.call(values, "sum") &&
             Object.prototype.hasOwnProperty.call(values, "count")
         ) {
+            let uncompact = [values.last];
+            if (values.min < values.last) uncompact.unshift(values.min);
+            if (values.max > values.last) uncompact.unshift(values.max);
+
             return new Stat(
-                [values.min, values.max].concat(
-                    new Array(values.count - 2).fill((values.sum - values.min - values.max) / (values.count - 2))
-                )
+                new Array(values.count - uncompact.length)
+                    .fill((values.sum - values.min - values.max) / (values.count - uncompact.length))
+                    .concat(uncompact)
             );
         }
 
@@ -70,10 +74,11 @@ export default class Stat implements StatInterface {
 
     toCompact(): StatCompactInterface {
         return {
-            count: Stat.round(this.getCount()),
+            count: this.getCount(),
             max: Stat.round(this.getMax()),
             min: Stat.round(this.getMin()),
-            sum: Stat.round(this.getSum())
+            sum: Stat.round(this.getSum()),
+            last: this.getLast()
         };
     }
-}
+};

@@ -12,6 +12,7 @@ export interface StatInterface {
 
 export interface StatCompactInterface {
     count: number;
+    last: number;
     max: number;
     min: number;
     sum: number;
